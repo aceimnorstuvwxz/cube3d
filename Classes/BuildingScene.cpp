@@ -23,6 +23,11 @@
 
 USING_NS_CC;
 
+const float MOVE_SCALE = 1.f;
+const float UP_DOWN_MAX = 0.99f;
+const float ROTATE_SCALE = 0.01f;
+const float SCALL_MOVE_SCALE = 0.1f;
+const float PI = 3.1415926f;
 class StateInfoLayer: public McdLayer
 {
 public:
@@ -63,6 +68,8 @@ bool BuildingScene::init()
     initMenuButtons();
 
     initSceneLayer();
+
+    scheduleUpdate();
 
     return true;
 }
@@ -202,7 +209,8 @@ void BuildingScene::copyTemplateWorkspace()
 
 void BuildingScene::initMenuButtons()
 {
-    addCommonBtn({0.1f,0.9f}, Msg::s()["unreal_bottom"], [this](){ addUnrealWall(UY, 100); });
+    addCommonBtn({0.1f,0.9f}, Msg::s()["unreal_bottom"], [this](){ addUnrealWall(UY, 2);
+    });
 }
 
 void BuildingScene::initSceneLayer()
@@ -213,16 +221,177 @@ void BuildingScene::initSceneLayer()
     auto size = Director::getInstance()->getVisibleSize();
 
     _sceneCamera = Camera::createPerspective(60, size.width/size.height, 1, 1000);
-    _sceneCamera->setPosition3D({0, 0, 500});
+    _sceneCamera->setPosition3D({0, 0, 200});
     _sceneCamera->lookAt({0,0,0});
     _sceneCamera->setCameraFlag(CameraFlag::USER2);
     _sceneLayer->addChild(_sceneCamera);
-    _sceneLayer->setCameraMask(_sceneCamera->getCameraMask());
+    _sceneLayer->setCameraMask((unsigned short)CameraFlag::USER2);
+
+    // Mouse and keyboard
+
+    // keyboard
+    auto _keyboardListener = EventListenerKeyboard::create();
+    _keyboardListener->onKeyPressed = [&](EventKeyboard::KeyCode code, Event* event){
+        switch (code) {
+            case EventKeyboard::KeyCode::KEY_SPACE:
+            CCLOG("key space, shot");
+            //TODO
+            break;
+
+            case EventKeyboard::KeyCode::KEY_W:
+            case EventKeyboard::KeyCode::KEY_CAPITAL_W:
+            CCLOG("key W down");
+            _zoomIn = true;
+            break;
+
+            case EventKeyboard::KeyCode::KEY_S:
+            case EventKeyboard::KeyCode::KEY_CAPITAL_S:
+            CCLOG("key S down");
+            _zoomOut = true;
+            break;
+
+            case EventKeyboard::KeyCode::KEY_A:
+            case EventKeyboard::KeyCode::KEY_CAPITAL_A:
+            CCLOG("key A down");
+            _left = true;
+            break;
+
+            case EventKeyboard::KeyCode::KEY_D:
+            case EventKeyboard::KeyCode::KEY_CAPITAL_D:
+            CCLOG("key D down");
+            _right = true;
+            break;
+
+            case EventKeyboard::KeyCode::KEY_Q:
+            case EventKeyboard::KeyCode::KEY_CAPITAL_Q:
+            CCLOG("key Q down");
+            _up = true;
+            break;
+
+            case EventKeyboard::KeyCode::KEY_E:
+            case EventKeyboard::KeyCode::KEY_CAPITAL_E:
+            CCLOG("key E down");
+            _down = true;
+            break;
+
+            default:
+            break;
+        }
+    };
+    _keyboardListener->onKeyReleased = [&](EventKeyboard::KeyCode code, Event* event){
+        switch (code) {
+            case EventKeyboard::KeyCode::KEY_SPACE:
+            CCLOG("key space, shot");
+            //TODO
+            break;
+
+            case EventKeyboard::KeyCode::KEY_W:
+            case EventKeyboard::KeyCode::KEY_CAPITAL_W:
+            CCLOG("key W up");
+            _zoomIn = false;
+            break;
+
+            case EventKeyboard::KeyCode::KEY_S:
+            case EventKeyboard::KeyCode::KEY_CAPITAL_S:
+            CCLOG("key S up");
+            _zoomOut = false;
+            break;
+
+            case EventKeyboard::KeyCode::KEY_A:
+            case EventKeyboard::KeyCode::KEY_CAPITAL_A:
+            CCLOG("key A up");
+            _left = false;
+            break;
+
+            case EventKeyboard::KeyCode::KEY_D:
+            case EventKeyboard::KeyCode::KEY_CAPITAL_D:
+            CCLOG("key D up");
+            _right = false;
+            break;
+            case EventKeyboard::KeyCode::KEY_Q:
+            case EventKeyboard::KeyCode::KEY_CAPITAL_Q:
+            CCLOG("key Q up");
+            _up = false;
+            break;
+
+            case EventKeyboard::KeyCode::KEY_E:
+            case EventKeyboard::KeyCode::KEY_CAPITAL_E:
+            CCLOG("key E up");
+            _down = false;
+            break;
+
+            default:
+            break;
+        }
+        
+    };
+    _eventDispatcher->addEventListenerWithSceneGraphPriority(_keyboardListener, this);
+
+    // mouse
+    auto _mouseListener = EventListenerMouse::create();
+
+    _mouseListener->onMouseMove = [&](Event *event){
+        if (!_isFPS) return;
+
+        EventMouse* e = (EventMouse*)event;
+        auto now = e->getLocation();
+        Vec2 diff = now - _fpsAnchor;
+        _fpsAnchor = now;
+        _rotateY -= ROTATE_SCALE*diff.x;
+        _rotateX -= ROTATE_SCALE*diff.y;
+        if (_rotateX > UP_DOWN_MAX*0.5f*PI) _rotateX = UP_DOWN_MAX*0.5f*PI;
+        if (_rotateX < -UP_DOWN_MAX*0.5f*PI) _rotateX = -UP_DOWN_MAX*0.5f*PI;
+
+    };
+    _mouseListener->onMouseUp = [&](Event *event){
+        EventMouse* e = (EventMouse*)event;
+        switch(e->getMouseButton()){
+            case MOUSE_BUTTON_LEFT:
+            break;
+
+            case MOUSE_BUTTON_RIGHT:
+            _isFPS = false;
+            break;
+
+            default:
+            break;
+        }
+    };
+    _mouseListener->onMouseDown = [&](Event *event){
+        EventMouse* e = (EventMouse*)event;
+        switch(e->getMouseButton()){
+            case MOUSE_BUTTON_LEFT:
+            break;
+
+            case MOUSE_BUTTON_RIGHT:
+            {
+                _isFPS = true;
+                _fpsAnchor = e->getLocation();
+                auto ro = _sceneCamera->getRotation3D();
+                CCLOG("%f,%f,%f", ro.x, ro.y, ro.z);
+                break;
+            }
+            default:
+            break;
+        }
+    };
+    _mouseListener->onMouseScroll = [&](Event *event){
+        EventMouse* e = (EventMouse*)event;
+        CCLOG("%f, %f", e->getScrollX(), e->getScrollY());
+        float diff = e->getScrollY();
+        Vec3 dir = _sceneCamera->getRotationQuat() * Vec3{0.f, 0.f, -1.f};
+        dir.normalize();
+        _sceneCamera->setPosition3D(_sceneCamera->getPosition3D() + SCALL_MOVE_SCALE * -diff * dir);
+    };
+    _eventDispatcher->addEventListenerWithSceneGraphPriority(_mouseListener, this);
+
 }
 
-cocos2d::Vec3 BuildingScene::rawPos2Real(cocos2d::Vec3 rawPos)
+cocos2d::Vec3 BuildingScene::rawPos2Real(cocos2d::Vec3 raw)
 {
-    return 10.f*rawPos;
+    auto ret = 10.f*raw;
+    CCLOG("%f %f %f %f %f %f", raw.x, raw.y, raw.z, ret.x, ret.y,ret.z);
+    return ret;
 }
 
 void BuildingScene::addCube(CubeSprite* cube)
@@ -230,17 +399,18 @@ void BuildingScene::addCube(CubeSprite* cube)
     assert(cube);
 
     // Add to HashTable
-    _cubeMap[cube->getRawPos()] = cube;
+//    _cubeMap[cube->getRawPos()] = cube;
+    _cubes.push_back(cube); //crash
 
     // Add to Scene
-    _sceneLayer->addChild(cube);
     cube->setPosition3D(rawPos2Real(cube->getRawPos()));
+    cube->setCameraMask(_sceneLayer->getCameraMask());
+    _sceneLayer->addChild(cube);
 }
 
 void BuildingScene::removeCube(CubeSprite* cube)
 {
     assert(cube);
-
 }
 
 
@@ -265,5 +435,46 @@ void BuildingScene::addUnrealWall(UnrealType t, int width)
             }
             addCube(CubeSprite::create(rawPos, _brushLayer->getSelectedCubeId()));
         }
+    }
+//    addCube(CubeSprite::create({0,0,0}, 0));
+}
+
+void BuildingScene::update(float dt)
+{
+    Quaternion qua2 = {Vec3(1.f,0.f,0.f), _rotateX};
+    Quaternion qua = {Vec3(0.f, 1.f, 0.f), _rotateY};
+    qua.multiply(qua2);
+    _sceneCamera->setRotationQuat(qua);
+
+    qua.normalize();
+    if (_up && !_down) {
+        Vec3 dir = qua * Vec3{0.f,1.f,0.f};
+        dir.normalize();
+        _sceneCamera->setPosition3D(_sceneCamera->getPosition3D() + MOVE_SCALE * dir);
+    }
+    if (_down && !_up) {
+        Vec3 dir = qua * Vec3{0.f,-1.f,0.f};
+        dir.normalize();
+        _sceneCamera->setPosition3D(_sceneCamera->getPosition3D() + MOVE_SCALE * dir);
+    }
+    if (_left && !_right) {
+        Vec3 dir = qua * Vec3{-1.f,0.f,0.f};
+        dir.normalize();
+        _sceneCamera->setPosition3D(_sceneCamera->getPosition3D() + MOVE_SCALE * dir);
+    }
+    if (_right && !_left) {
+        Vec3 dir = qua * Vec3{1.f,0.f,0.f};
+        dir.normalize();
+        _sceneCamera->setPosition3D(_sceneCamera->getPosition3D() + MOVE_SCALE * dir);
+    }
+    if (_zoomIn && !_zoomOut) {
+        Vec3 dir = qua * Vec3{0.f,0.f,-1.f};
+        dir.normalize();
+        _sceneCamera->setPosition3D(_sceneCamera->getPosition3D() + MOVE_SCALE * dir);
+    }
+    if (_zoomOut && !_zoomIn) {
+        Vec3 dir = qua * Vec3{0.f,0.f,1.f};
+        dir.normalize();
+        _sceneCamera->setPosition3D(_sceneCamera->getPosition3D() + MOVE_SCALE * dir);
     }
 }

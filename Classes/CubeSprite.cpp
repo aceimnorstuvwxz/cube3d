@@ -13,15 +13,17 @@ CubeSprite* CubeSprite::create(const cocos2d::Vec3& pos_raw, int metaCubeId)
 
     if (sprite && sprite->init(pos_raw, metaCubeId)) {
         sprite->autorelease();
-    } else {
-        CC_SAFE_DELETE(sprite);
+        return sprite;
     }
-    return sprite;
+
+    CC_SAFE_DELETE(sprite);
+    return nullptr;
 }
 
 bool CubeSprite::init(const cocos2d::Vec3& pos_raw, int metaCubeId)
 {
-    if (!Node::init()) return false;
+
+    assert(Node::init());
 
     _metaCubeId = metaCubeId;
     _blendFunc = BlendFunc::ALPHA_NON_PREMULTIPLIED;
@@ -31,6 +33,7 @@ bool CubeSprite::init(const cocos2d::Vec3& pos_raw, int metaCubeId)
     _color = EditState::s()->getMetaCube(metaCubeId)->color;
     _renderMesh = metaCube->getRenderMesh();
     _texture = metaCube->getTexture();
+    _posRaw = pos_raw;
     
     return true;
 }

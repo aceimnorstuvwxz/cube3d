@@ -29,6 +29,7 @@ private:
     bool _isCubesVisible = false;
     void hideOrShowAllMetaCubes();
 
+
 };
 
 #endif /* defined(__cube3d__BrushLayer__) */
